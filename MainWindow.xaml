@@ -1,0 +1,305 @@
+<Window x:Class="FFmpegCutStudio.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:FFmpegCutStudio.Controls"
+        Title="FFmpegCutStudio"
+        Background="{StaticResource BgCanvas}"
+        Foreground="{StaticResource TextPrimary}"
+        FontFamily="Microsoft YaHei UI, Segoe UI"
+        FontSize="12"
+        Width="1100" Height="650" MinWidth="860" MinHeight="540"
+        WindowStartupLocation="CenterScreen"
+        WindowState="Maximized"
+        AllowDrop="True"
+        Drop="Window_Drop"
+        PreviewKeyDown="Window_PreviewKeyDown">
+
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>   <!-- 顶部精简栏 -->
+            <RowDefinition Height="Auto"/>   <!-- 可选设置抽屉 -->
+            <RowDefinition Height="*"/>      <!-- 主工作区：左大预览 + 右工具栏 -->
+            <RowDefinition Height="Auto"/>   <!-- 底部单行状态栏 + 可折叠日志 -->
+        </Grid.RowDefinitions>
+
+        <!-- Row 0: 极简顶部栏 -->
+        <Border Grid.Row="0" Background="{StaticResource BgPanel}" BorderBrush="{StaticResource BorderSubtle}"
+                BorderThickness="1" CornerRadius="8" Padding="10,7" Margin="0,0,0,8">
+            <DockPanel LastChildFill="False">
+                <Button Content="打开视频" Style="{StaticResource PrimaryButton}" Click="BtnOpenVideo_Click" Padding="14,5" Margin="0,0,10,0"/>
+                <TextBlock x:Name="TxtCurrentFile" Text="点击打开，或直接将视频 / 字幕拖入窗口"
+                           Foreground="{StaticResource TextMuted}" MaxWidth="420" TextTrimming="CharacterEllipsis" Margin="0,0,10,0"/>
+                <Border Background="#1E2536" BorderBrush="#2C364F" BorderThickness="1" CornerRadius="10" Padding="9,2" VerticalAlignment="Center">
+                    <TextBlock x:Name="TxtPreviewBackend" Text="检测中..." FontSize="11" Foreground="#93C5FD"/>
+                </Border>
+
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                    <CheckBox x:Name="ChkNvenc" Content="NVENC 硬件加速" IsChecked="True" Margin="0,0,12,0"/>
+                    <TextBlock Text="画质:" Foreground="{StaticResource TextMuted}" Margin="0,0,5,0"/>
+                    <TextBox x:Name="TxtQuality" Text="19" Width="38" HorizontalContentAlignment="Center" Margin="0,0,10,0"/>
+                    <Button x:Name="BtnToggleSettings" Content="⚙ 路径" ToolTip="展开或收起 ffmpeg / ffprobe 路径配置" Click="BtnToggleSettings_Click" Padding="9,4"/>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- Row 1: 可折叠 FFmpeg 路径配置栏（默认隐藏，不占空间） -->
+        <Border Grid.Row="1" x:Name="PanelSettings" Visibility="Collapsed"
+                Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderSubtle}"
+                BorderThickness="1" CornerRadius="6" Padding="10,6" Margin="0,0,0,8">
+            <DockPanel LastChildFill="False">
+                <TextBlock Text="ffmpeg 路径:" Foreground="{StaticResource TextMuted}" Margin="0,0,6,0"/>
+                <TextBox x:Name="TxtFFmpegPath" Text="ffmpeg" Width="220" Margin="0,0,16,0"/>
+                <TextBlock Text="ffprobe 路径:" Foreground="{StaticResource TextMuted}" Margin="0,0,6,0"/>
+                <TextBox x:Name="TxtFFprobePath" Text="ffprobe" Width="220"/>
+            </DockPanel>
+        </Border>
+
+        <!-- Row 2: 左右分栏主工作区 -->
+        <Grid Grid.Row="2" Margin="0,0,0,8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" MinWidth="480"/>
+                <ColumnDefinition Width="8"/>
+                <ColumnDefinition Width="345" MinWidth="300" MaxWidth="500"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- 左侧：超大画面预览 + 时间轴 + 播控 -->
+            <Grid Grid.Column="0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <Border Grid.Row="0" Background="#07080B" BorderBrush="{StaticResource BorderSubtle}"
+                        BorderThickness="1" CornerRadius="8" ClipToBounds="True" Margin="0,0,0,8">
+                    <Grid x:Name="VideoHostContainer">
+                        <MediaElement x:Name="FallbackMediaElement"
+                                      LoadedBehavior="Manual"
+                                      UnloadedBehavior="Manual"
+                                      ScrubbingEnabled="True"
+                                      Stretch="Uniform"
+                                      Visibility="Collapsed"
+                                      MediaFailed="FallbackMediaElement_MediaFailed"/>
+                        <StackPanel x:Name="TxtPlayerHint" HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <TextBlock Text="拖入视频文件开始剪辑" Foreground="#64748B" FontSize="16" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                            <TextBlock Text="支持 Space 播放 · ←/→ 逐帧 · [/] 关键帧 · I/O 打点 · N 新增分段"
+                                       Foreground="#475569" FontSize="11.5" Margin="0,6,0,0" HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <Border Grid.Row="1" Background="{StaticResource BgPanel}" BorderBrush="{StaticResource BorderSubtle}"
+                        BorderThickness="1" CornerRadius="8" Padding="10,7">
+                    <StackPanel>
+                        <controls:TimelineControl x:Name="Timeline"/>
+                        <DockPanel LastChildFill="False" Margin="2,6,2,0">
+                            <WrapPanel DockPanel.Dock="Left" Orientation="Horizontal">
+                                <Button Content="▶/❚❚" ToolTip="播放 / 暂停 (Space)" Click="BtnPlayPause_Click" Padding="10,4" Margin="0,0,5,0"/>
+                                <Button Content="‹ 帧" ToolTip="上一帧 (←)，按住 Shift 后退 5 秒" Click="BtnPrevFrame_Click" Padding="8,4" Margin="0,0,3,0"/>
+                                <Button Content="帧 ›" ToolTip="下一帧 (→)，按住 Shift 前进 5 秒" Click="BtnNextFrame_Click" Padding="8,4" Margin="0,0,8,0"/>
+                                <Button Content="⏮ KF" ToolTip="跳转到上一关键帧 ([)" Click="BtnPrevKeyframe_Click" Padding="8,4" Margin="0,0,3,0"/>
+                                <Button Content="KF ⏭" ToolTip="跳转到下一关键帧 (])" Click="BtnNextKeyframe_Click" Padding="8,4" Margin="0,0,10,0"/>
+                                <Button Content="设起点 I" Style="{StaticResource PrimaryButton}" ToolTip="将当前播放位置设为选中分段的起点 (I)" Click="BtnSetIn_Click" Padding="9,4" Margin="0,0,4,0"/>
+                                <Button Content="设终点 O" Style="{StaticResource SuccessButton}" ToolTip="将当前播放位置设为选中分段的终点 (O)" Click="BtnSetOut_Click" Padding="9,4" Margin="0,0,4,0"/>
+                                <Button Content="+ 分段 N" ToolTip="在当前播放位置新增一个裁剪分段 (N)" Click="BtnAddSegment_Click" Padding="9,4"/>
+                            </WrapPanel>
+                            <TextBlock x:Name="TxtTimecode" DockPanel.Dock="Right"
+                                       Text="00:00:00.000 / 00:00:00.000"
+                                       FontFamily="Consolas" FontSize="13" FontWeight="SemiBold"
+                                       Foreground="#93C5FD" Margin="8,0,0,0"/>
+                        </DockPanel>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- 中间可拖动分隔条 -->
+            <GridSplitter Grid.Column="1" Width="8" HorizontalAlignment="Stretch" Background="Transparent" Cursor="SizeWE"/>
+
+            <!-- 右侧：4 功能精简工具箱 -->
+            <TabControl Grid.Column="2">
+                <!-- Tab 1: 多段裁剪 & 多视频合并 -->
+                <TabItem Header="裁剪 / 合并">
+                    <Grid Margin="10">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="1.15*"/>
+                            <RowDefinition Height="10"/>
+                            <RowDefinition Height="1*"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- 上卡片：多段裁剪 -->
+                        <Border Grid.Row="0" Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderSubtle}"
+                                BorderThickness="1" CornerRadius="6" Padding="9">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <DockPanel Grid.Row="0" LastChildFill="False" Margin="0,0,0,6">
+                                    <TextBlock Text="分段列表 (I / O / N)" FontWeight="SemiBold"/>
+                                    <Button DockPanel.Dock="Right" Content="删除" ToolTip="删除选中的分段 (Delete)" Click="BtnDeleteSegment_Click" Padding="8,2"/>
+                                </DockPanel>
+                                <ListBox Grid.Row="1" x:Name="ListSegments" DisplayMemberPath="Summary"
+                                         SelectionChanged="ListSegments_SelectionChanged" Margin="0,0,0,7"/>
+                                <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,8">
+                                    <RadioButton x:Name="RbCutPrecise" Content="精准重编码" IsChecked="True" Margin="0,0,14,0"/>
+                                    <RadioButton x:Name="RbCutLossless" Content="极速无损 (关键帧)"/>
+                                </StackPanel>
+                                <UniformGrid Grid.Row="3" Columns="2">
+                                    <Button Content="合并导出单文件" Style="{StaticResource PrimaryButton}" Click="BtnExportMergedSegments_Click" Margin="0,0,4,0"/>
+                                    <Button Content="分别导出多文件" Click="BtnExportSeparateSegments_Click" Margin="4,0,0,0"/>
+                                </UniformGrid>
+                            </Grid>
+                        </Border>
+
+                        <!-- 下卡片：多视频智能合并 -->
+                        <Border Grid.Row="2" Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderSubtle}"
+                                BorderThickness="1" CornerRadius="6" Padding="9">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <DockPanel Grid.Row="0" LastChildFill="False" Margin="0,0,0,6">
+                                    <TextBlock Text="多视频合并" FontWeight="SemiBold"/>
+                                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                        <Button Content="+ 添加" Click="BtnMergeAdd_Click" Padding="7,2" Margin="0,0,3,0"/>
+                                        <Button Content="↑" ToolTip="上移" Click="BtnMergeUp_Click" Padding="6,2" Margin="0,0,2,0"/>
+                                        <Button Content="↓" ToolTip="下移" Click="BtnMergeDown_Click" Padding="6,2" Margin="0,0,3,0"/>
+                                        <Button Content="删" ToolTip="从合并队列移除" Click="BtnMergeRemove_Click" Padding="7,2"/>
+                                    </StackPanel>
+                                </DockPanel>
+                                <ListBox Grid.Row="1" x:Name="ListMergeFiles" Margin="0,0,0,6"/>
+                                <ComboBox Grid.Row="2" x:Name="CmbMergeStrategy" SelectedIndex="0" Margin="0,0,0,7">
+                                    <ComboBoxItem Content="智能自动（直连 / TS中转 / 重编）"/>
+                                    <ComboBoxItem Content="强制无损直连 (concat demuxer)"/>
+                                    <ComboBoxItem Content="强制 TS 中转无损"/>
+                                    <ComboBoxItem Content="强制统一规格重编码"/>
+                                </ComboBox>
+                                <Button Grid.Row="3" Content="开始合并视频" Style="{StaticResource PrimaryButton}" Click="BtnMergeStart_Click"/>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </TabItem>
+
+                <!-- Tab 2: 音视频分离 / 合并 -->
+                <TabItem Header="音视频">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel Margin="10">
+                            <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderSubtle}"
+                                    BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,0,0,10">
+                                <StackPanel>
+                                    <TextBlock Text="无损分离当前视频" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                                    <CheckBox x:Name="ChkDemuxVideo" Content="提取纯视频 (-c:v copy)" IsChecked="True" Margin="0,0,0,6"/>
+                                    <CheckBox x:Name="ChkDemuxAudio" Content="提取纯音频 (自动匹配后缀)" IsChecked="True" Margin="0,0,0,10"/>
+                                    <Button Content="选择输出目录并分离" Style="{StaticResource PrimaryButton}" Click="BtnDemuxStart_Click"/>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderSubtle}"
+                                    BorderThickness="1" CornerRadius="6" Padding="10">
+                                <StackPanel>
+                                    <TextBlock Text="合并 / 替换音轨" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                                    <TextBlock Text="视频文件" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,0,0,3"/>
+                                    <DockPanel Margin="0,0,0,8">
+                                        <Button DockPanel.Dock="Right" Content="选择" Click="BtnMuxPickVideo_Click" Margin="5,0,0,0"/>
+                                        <TextBox x:Name="TxtMuxVideo"/>
+                                    </DockPanel>
+                                    <TextBlock Text="音频文件" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,0,0,3"/>
+                                    <DockPanel Margin="0,0,0,8">
+                                        <Button DockPanel.Dock="Right" Content="选择" Click="BtnMuxPickAudio_Click" Margin="5,0,0,0"/>
+                                        <TextBox x:Name="TxtMuxAudio"/>
+                                    </DockPanel>
+                                    <CheckBox x:Name="ChkMuxShortest" Content="以较短流为准 (-shortest)" IsChecked="True" Margin="0,0,0,6"/>
+                                    <CheckBox x:Name="ChkMuxAac" Content="音频转 AAC (兼容 MP4)" Margin="0,0,0,10"/>
+                                    <Button Content="选择输出路径并合并" Style="{StaticResource PrimaryButton}" Click="BtnMuxStart_Click"/>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+
+                <!-- Tab 3: 字幕分离 / 软封装 -->
+                <TabItem Header="软字幕">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel Margin="10">
+                            <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderSubtle}"
+                                    BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,0,0,10">
+                                <StackPanel>
+                                    <TextBlock Text="提取内封字幕" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                                    <ComboBox x:Name="CmbSubStreams" Margin="0,0,0,10"/>
+                                    <Button Content="提取选中字幕轨" Style="{StaticResource PrimaryButton}" Click="BtnSubExtract_Click"/>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderSubtle}"
+                                    BorderThickness="1" CornerRadius="6" Padding="10">
+                                <StackPanel>
+                                    <TextBlock Text="软封装外挂字幕" FontWeight="SemiBold" Margin="0,0,0,3"/>
+                                    <TextBlock Text="MKV 原样保留 ASS 特效，MP4 自动转 mov_text" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,0,0,8"/>
+                                    <DockPanel Margin="0,0,0,8">
+                                        <Button DockPanel.Dock="Right" Content="选择" Click="BtnSoftSubPick_Click" Margin="5,0,0,0"/>
+                                        <TextBox x:Name="TxtSoftSubPath"/>
+                                    </DockPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                        <TextBlock Text="语言标签:" Foreground="{StaticResource TextMuted}" Margin="0,0,6,0"/>
+                                        <TextBox x:Name="TxtSoftSubLang" Text="chi" Width="70"/>
+                                    </StackPanel>
+                                    <Button Content="选择输出文件并软封装" Style="{StaticResource PrimaryButton}" Click="BtnSoftSubMux_Click"/>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+
+                <!-- Tab 4: 字幕硬写入 -->
+                <TabItem Header="硬字幕">
+                    <StackPanel Margin="10">
+                        <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderSubtle}"
+                                BorderThickness="1" CornerRadius="6" Padding="10">
+                            <StackPanel>
+                                <TextBlock Text="字幕硬写入（烧录进画面）" FontWeight="SemiBold" Margin="0,0,0,3"/>
+                                <TextBlock Text="自动隔离中文与盘符路径，支持顶部 NVENC 加速" Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,10"/>
+                                <TextBlock Text="字幕文件 (.srt / .ass)" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,0,0,3"/>
+                                <DockPanel Margin="0,0,0,8">
+                                    <Button DockPanel.Dock="Right" Content="选择" Click="BtnHardSubPick_Click" Margin="5,0,0,0"/>
+                                    <TextBox x:Name="TxtHardSubPath"/>
+                                </DockPanel>
+                                <Button Content="加载到左侧画面预览" Click="BtnPreviewHardSub_Click" Margin="0,0,0,10"/>
+                                <CheckBox x:Name="ChkHardSubCopyAudio" Content="音频无损直拷 (-c:a copy)" IsChecked="True" Margin="0,0,0,12"/>
+                                <Button Content="选择输出文件并开始硬写入" Style="{StaticResource PrimaryButton}" Click="BtnHardSubStart_Click"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </TabItem>
+            </TabControl>
+        </Grid>
+
+        <!-- Row 3: 底部状态栏 -->
+        <Border Grid.Row="3" Background="{StaticResource BgPanel}" BorderBrush="{StaticResource BorderSubtle}"
+                BorderThickness="1" CornerRadius="8" Padding="10,6">
+            <StackPanel>
+                <DockPanel LastChildFill="False">
+                    <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Ellipse x:Name="StatusDot" Width="8" Height="8" Fill="{StaticResource AccentGreen}" Margin="0,0,7,0"/>
+                        <TextBlock x:Name="TxtStatus" Text="就绪" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold"/>
+                        <ProgressBar x:Name="ProgressBar" Width="160" Margin="14,0,0,0" IsIndeterminate="False"/>
+                    </StackPanel>
+
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                        <Button Content="清空日志" Padding="10,3" Click="BtnClearLog_Click" Margin="0,0,6,0"/>
+                        <Button x:Name="BtnToggleLog" Content="展开日志 ▲" Padding="10,3" Click="BtnToggleLog_Click" Margin="0,0,6,0"/>
+                        <Button x:Name="BtnCancelTask" Content="停止任务" Style="{StaticResource DangerButton}"
+                                IsEnabled="False" Padding="10,3" Click="BtnCancelTask_Click"/>
+                    </StackPanel>
+                </DockPanel>
+                <TextBox x:Name="TxtLog" Height="120" Margin="0,7,0,0" Visibility="Collapsed"
+                         IsReadOnly="True" TextWrapping="NoWrap"
+                         VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
+                         FontFamily="Consolas" FontSize="11.5" Background="#0B0D12" BorderThickness="0"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>

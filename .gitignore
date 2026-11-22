@@ -1,0 +1,42 @@
+# .NET / Visual Studio / Rider 构建与缓存目录
+bin/
+obj/
+out/
+publish/
+.vs/
+.idea/
+.vscode/
+
+# 用户本地配置与临时文件
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.cache
+*.log
+*.tmp
+Thumbs.db
+desktop.ini
+
+# 外部二进制运行依赖（避免将大体积 DLL / EXE 提交进仓库）
+libmpv-2.dll
+mpv-2.dll
+ffmpeg.exe
+ffprobe.exe
+ffplay.exe
+
+# 本地测试媒体文件
+*.mp4
+*.mkv
+*.mov
+*.avi
+*.flv
+*.ts
+*.webm
+*.m4a
+*.aac
+*.mp3
+*.wav
+*.flac
+*.srt
+*.ass
